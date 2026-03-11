@@ -8,7 +8,7 @@ This repository contains a Python script and GitHub Actions workflow that wakes 
 
 ## How it works
 
-1. The Python script uses Selenium to navigate to each app URL, check if the "Wake Up" button is already clicked, and click it if necessary.
+1. The Python script first makes a lightweight HTTP request to see if the app is sleeping, and only launches Selenium to click the "Wake Up" button when needed. It also supports retries and an optional minimum interval between runs.
 2. The GitHub Actions workflow runs the Python script on a schedule (daily at 12:00 AM UTC) and on push events to the main branch.
 
 ## Repository contents
@@ -35,4 +35,4 @@ The log file is uploaded as an artifact after each workflow run.
 
 ## Schedule
 
-The workflow runs daily at 12:00 AM UTC and on push events to the main branch. You can adjust the schedule in the `.github/workflows/wake-up.yml` file.
+The workflow runs every 6 hours and on push events to the main branch. You can adjust the schedule and interval in the `.github/workflows/wake_up.yml` file.
