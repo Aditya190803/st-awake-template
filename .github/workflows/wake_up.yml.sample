@@ -5,24 +5,22 @@ on:
     branches:
       - main
   schedule:
-    - cron: "0 */6 * * *"
+      - cron: "0 * * * *"
 
 jobs:
   wake-up:
     runs-on: ubuntu-latest
     env:
-      WAKE_INTERVAL_HOURS: "6"
+      WAKE_INTERVAL_HOURS: "10"
+      ENFORCE_WAKE_INTERVAL: "1"
       WAKE_STATE_FILE: "wakeup_state.json"
-      HTTP_MAX_RETRIES: "2"
-      BROWSER_MAX_RETRIES: "2"
-      RETRY_BACKOFF_SECONDS: "2"
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Restore wake state cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: wakeup_state.json
           key: wakeup-state-${{ runner.os }}-${{ github.run_id }}
@@ -30,19 +28,19 @@ jobs:
             wakeup-state-${{ runner.os }}-
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: "3.x"
 
       - name: Install dependencies
         run: |
-          pip install selenium requests
+          pip install -r requirements.txt
 
       - name: Run Python script to wake up Streamlit apps
         run: python wake_up_streamlit.py
 
       - name: Upload log file as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: wakeup-log
           path: wakeup_log.txt
