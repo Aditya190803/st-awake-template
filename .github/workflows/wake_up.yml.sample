@@ -5,27 +5,15 @@ on:
     branches:
       - main
   schedule:
-      - cron: "0 * * * *"
+      - cron: "0 */12 * * *"
 
 jobs:
   wake-up:
     runs-on: ubuntu-latest
-    env:
-      WAKE_INTERVAL_HOURS: "10"
-      ENFORCE_WAKE_INTERVAL: "1"
-      WAKE_STATE_FILE: "wakeup_state.json"
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
-
-      - name: Restore wake state cache
-        uses: actions/cache@v5
-        with:
-          path: wakeup_state.json
-          key: wakeup-state-${{ runner.os }}-${{ github.run_id }}
-          restore-keys: |
-            wakeup-state-${{ runner.os }}-
 
       - name: Set up Python
         uses: actions/setup-python@v6
