@@ -19,6 +19,8 @@ BROWSER_PAGELOAD_TIMEOUT_SECONDS = float(
 )
 SITE_WAIT_SECONDS = float(os.getenv("SITE_WAIT_SECONDS", "25"))
 BUTTON_APPEAR_WAIT_SECONDS = float(os.getenv("BUTTON_APPEAR_WAIT_SECONDS", "12"))
+WAKE_CONFIRM_WAIT_SECONDS = float(os.getenv("WAKE_CONFIRM_WAIT_SECONDS", "120"))
+WAKE_CLICK_RETRIES = max(1, int(os.getenv("WAKE_CLICK_RETRIES", "3")))
 WAKE_INTERVAL_HOURS = float(os.getenv("WAKE_INTERVAL_HOURS", "10"))
 MAX_CONCURRENT_APPS = max(1, int(os.getenv("MAX_CONCURRENT_APPS", "5")))
 STATE_FILE = os.getenv("WAKE_STATE_FILE", "wakeup_state.json")
@@ -38,6 +40,12 @@ SLEEP_TEXT_MARKERS = (
     "yes, get this app back up!",
     "this app has gone to sleep due to inactivity",
     "zzzz",
+)
+NOT_APP_CONTENT_MARKERS = SLEEP_TEXT_MARKERS + (
+    "this app is waking up",
+    "your app is waking up",
+    "please wait",
+    "this may take a few moments",
 )
 WAKE_BUTTON_LOCATORS = (
     (By.CSS_SELECTOR, "button[data-testid='wakeup-button-viewer']"),
@@ -161,6 +169,22 @@ def click_wake_button_if_available(driver) -> bool:
     return True
 
 
+def wait_for_app_after_wake(driver) -> bool:
+    deadline = time.time() + WAKE_CONFIRM_WAIT_SECONDS
+    clicks = 0
+
+    while time.time() < deadline:
+        if app_content_loaded(driver):
+            return True
+
+        if clicks < WAKE_CLICK_RETRIES and click_wake_button_if_available(driver):
+            clicks += 1
+
+        time.sleep(2)
+
+    return False
+
+
 def app_content_loaded(driver) -> bool:
     try:
         ready_state = driver.execute_script("return document.readyState") or ""
@@ -176,7 +200,7 @@ def app_content_loaded(driver) -> bool:
         body_text = ""
 
     lowered_body = body_text.lower()
-    if any(marker in lowered_body for marker in SLEEP_TEXT_MARKERS):
+    if any(marker in lowered_body for marker in NOT_APP_CONTENT_MARKERS):
         return False
 
     if len(body_text) >= 40:
@@ -210,7 +234,11 @@ def check_site(url: str) -> tuple[str, str]:
                     time.sleep(1)
                 else:
                     return "errors", "sleep markers found but wake button never appeared"
-                return "woken", "sleep marker found and wake button clicked"
+
+                if wait_for_app_after_wake(driver):
+                    return "woken", "sleep marker found, wake button clicked, and app content loaded"
+
+                return "errors", "wake button clicked but app content did not load before timeout"
 
             if app_content_loaded(driver):
                 return "awake", "app content loaded"
@@ -235,10 +263,13 @@ async def process_site(index: int, total: int, url: str, log_file, semaphore) ->
 async def main() -> None:
     with open(LOG_FILE, "a", encoding="utf-8") as log_file:
         log_message(log_file, "Execution started")
-        log_message(
-            log_file,
-            f"Configured wake interval: every {WAKE_INTERVAL_HOURS} hour(s)",
-        )
+        if ENFORCE_WAKE_INTERVAL and WAKE_INTERVAL_HOURS > 0:
+            log_message(
+                log_file,
+                f"Configured wake interval: every {WAKE_INTERVAL_HOURS} hour(s)",
+            )
+        else:
+            log_message(log_file, "Wake interval disabled; checking apps every run")
         log_message(
             log_file,
             f"Configured concurrency: up to {min(MAX_CONCURRENT_APPS, len(UNIQUE_STREAMLIT_APPS))} app(s)",
